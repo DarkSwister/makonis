@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+const app = require('../app');
+
+
+app.listen(9091, () => {
+  console.log(`Example app listening on port 9091`)
+})
+
+
+
