@@ -4,4 +4,6 @@ supervisord.log
 supervisord.pid
 openalpr
 .mp4
+tmp
 app.log
+.idea
