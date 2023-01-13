@@ -10,6 +10,7 @@ let minioClient = new minio.Client({
 });
 const alpr = require('./controllers/alpr');
 
+//Rabbit tur atverto connection uz rindu ar nosaukumu cars un pārsūta faila nosaukumu apstrādātājam
 exports.send = function(image){
     amqp.connect('amqp://rabbit:5672', function (error0, connection) {
         if (error0) {
@@ -20,8 +21,8 @@ exports.send = function(image){
                 throw error1;
             }
 
-            var queue = 'cars';
-            var msg = image;
+            let queue = 'cars';
+            let msg = image;
 
             channel.assertQueue(queue, {
                 durable: true
@@ -34,6 +35,7 @@ exports.send = function(image){
     });
 }
 
+//Apstrādātājs, gaida faila nosaukumu
 amqp.connect('amqp://rabbit:5672', function (error0, connection) {
     if (error0) {
         throw error0;
@@ -43,7 +45,7 @@ amqp.connect('amqp://rabbit:5672', function (error0, connection) {
             throw error1;
         }
 
-        var queue = 'cars';
+        let queue = 'cars';
 
         channel.assertQueue(queue, {
             durable: true
@@ -53,17 +55,26 @@ amqp.connect('amqp://rabbit:5672', function (error0, connection) {
 
         channel.consume(queue, function (msg) {
             console.log(" [x] Received %s", msg.content.toString());
+            //atrod failu iekš minio
             minioClient.fGetObject('cars', msg.content.toString(), `tmp/${msg.content.toString()}`, function (err) {
                 if (err) {
-                    return console.log(err)
+                    console.log(err)
                 }
+                //izmantojos openalpr atpazīstam nummurzīmi
                 console.log('Car image received')
-                exec(`alpr -c eu -p lv -j ./tmp/${msg.content.toString()}`,function(error, stdout, stderr){
-                    console.log("Got info from alpr");
-                    console.log("Parsing JSON");
+                exec(`alpr -c eu -p lv -j ./tmp/${msg.content.toString()}`,(error, stdout,stderr) => {
+                    if (error) {
+                        console.log(JSON.stringify(error));
+                    } else {
+                        const result = JSON.parse(stdout)
 
-                    alpr.create(JSON.parse(stdout.toString()));
-                })
+                        if (result.results.length < 1) {
+                            console.log('No plates found in image')
+                        } else {
+                            alpr.create(JSON.parse(stdout.toString()));
+                        }
+                    }
+                });
             })
         }, {
             noAck: true

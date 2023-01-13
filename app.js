@@ -10,7 +10,7 @@ const rabbit = require('./rabbit');
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-
+//Pievienošanas pie Minio
 let minioClient = new Minio.Client({
     endPoint: "minio",
     port: 9000,
@@ -19,7 +19,7 @@ let minioClient = new Minio.Client({
     secretKey: 'minioadmin'
 });
 
-//setup bucket
+//Izveidojam cars bucket gadijumā ja tāda nav iekš minio
 minioClient.bucketExists('cars', function (err, exists) {
     if (err) {
         console.log(err);
@@ -28,6 +28,8 @@ minioClient.bucketExists('cars', function (err, exists) {
         minioClient.makeBucket('cars');
     }
 })
+
+//Ar multer palīdzību saņemam failu un saglabājam iekš minio, izveidojam rabbit mq rindu un atsūtam faila nosaukumu
 app.post("/enter", Multer({storage: Multer.memoryStorage()}).single("car"), function(request, response) {
     minioClient.putObject("cars", request.file.originalname, request.file.buffer, function(error, etag) {
         if(error) {
@@ -35,9 +37,10 @@ app.post("/enter", Multer({storage: Multer.memoryStorage()}).single("car"), func
         }
         rabbit.send(request.file.originalname);
 
-        response.send(request.file);
+        response.send(request.file.originalname);
     });
 });
+
 app.post("/exit", Multer({storage: Multer.memoryStorage()}).single("car"), function(request, response) {
     minioClient.putObject("cars", request.file.originalname, request.file.buffer, function(error, etag) {
         if(error) {
@@ -45,7 +48,7 @@ app.post("/exit", Multer({storage: Multer.memoryStorage()}).single("car"), funct
         }
         rabbit.send(request.file.originalname);
 
-        response.send(request.file);
+        response.send(request.file.originalname);
     });
 });
 
