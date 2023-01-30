@@ -2,7 +2,7 @@ let amqp = require('amqplib/callback_api');
 const exec = require('child_process').exec;
 let minio = require('minio')
 let minioClient = new minio.Client({
-    endPoint:  "minio",
+    endPoint: "minio",
     port: 9000,
     useSSL: false,
     accessKey: 'minioadmin',
@@ -11,7 +11,7 @@ let minioClient = new minio.Client({
 const alpr = require('./controllers/alpr');
 
 //Rabbit tur atverto connection uz rindu ar nosaukumu cars un pārsūta faila nosaukumu apstrādātājam
-exports.send = function(image){
+exports.send = function (image) {
     amqp.connect('amqp://rabbit:5672', function (error0, connection) {
         if (error0) {
             throw error0;
@@ -22,7 +22,7 @@ exports.send = function(image){
             }
 
             let queue = 'cars';
-            let msg = image;
+            let msg = JSON.stringify(image);
 
             channel.assertQueue(queue, {
                 durable: true
@@ -52,17 +52,17 @@ amqp.connect('amqp://rabbit:5672', function (error0, connection) {
         });
 
         console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", queue);
-
         channel.consume(queue, function (msg) {
-            console.log(" [x] Received %s", msg.content.toString());
+            let obj = JSON.parse(msg.content);
+            console.log(" [x] Received %s", obj);
             //atrod failu iekš minio
-            minioClient.fGetObject('cars', msg.content.toString(), `tmp/${msg.content.toString()}`, function (err) {
+            minioClient.fGetObject('cars', obj.file, `tmp/${obj.file}`, function (err) {
                 if (err) {
                     console.log(err)
                 }
                 //izmantojos openalpr atpazīstam nummurzīmi
                 console.log('Car image received')
-                exec(`alpr -c eu -p lv -j ./tmp/${msg.content.toString()}`,(error, stdout,stderr) => {
+                exec(`alpr -c eu -p lv -j ./tmp/${obj.file}`, (error, stdout, stderr) => {
                     if (error) {
                         console.log(JSON.stringify(error));
                     } else {
@@ -71,7 +71,7 @@ amqp.connect('amqp://rabbit:5672', function (error0, connection) {
                         if (result.results.length < 1) {
                             console.log('No plates found in image')
                         } else {
-                            alpr.create(JSON.parse(stdout.toString()));
+                            alpr.create(JSON.parse(stdout.toString()), obj.email);
                         }
                     }
                 });
