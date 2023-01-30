@@ -1,3 +1,5 @@
+Epasta sūtīšana atrodas alpr.js failā iekš controllers mapes!
+
 1)Palaižot pirmo reizi, konsolē ievadam komandu
 docker-compose up
 
